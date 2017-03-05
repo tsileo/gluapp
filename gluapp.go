@@ -161,17 +161,6 @@ func responseJsonify(L *lua.LState) int {
 	return 0
 }
 
-// var Code = `
-// router = require('router').new()
-// router:get('/', function(params)
-//   print(params)
-//   print('index from userfunc')
-//   response:jsonify{ok = 1}
-//   response:status(500)
-// end)
-// router:run()
-// `
-
 // Exec run the code as a Lua script
 func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 	// TODO(tsileo): clean error
@@ -186,7 +175,7 @@ func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 	resp := setupResponse(L, w)
 
 	// Setup the `router` module
-	L.PreloadModule("router", setupRouter(r.Method, r.URL.Path))
+	L.PreloadModule("router", setupRouter(resp, r.Method, r.URL.Path))
 
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {

@@ -11,7 +11,10 @@ Designed to be used as router for luareq.
 package gluapp
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -20,6 +23,11 @@ import (
 )
 
 const any = "any"
+
+var (
+	errMethodNotAllowed = errors.New("method not allowed")
+	errNotFound         = errors.New("not found")
+)
 
 // route represents a registed route method/path
 type route struct {
@@ -32,10 +40,7 @@ type route struct {
 // params represents a route named parameters
 type params map[string]string
 
-func (r *route) match(method, path string) (bool, params) {
-	if method != any && method != r.method {
-		return false, nil
-	}
+func (r *route) match(path string) (bool, params) {
 	if r.regexp != nil {
 		matches := r.regexp.FindStringSubmatch(path)
 		if matches != nil {
@@ -52,16 +57,19 @@ func (r *route) match(method, path string) (bool, params) {
 	return false, nil
 }
 
-// TODO(tsileo): use the router directly and embed a request in it, also use LFunction instead of interface{}
 // Router represents the router and holds the routes.
 type router struct {
 	method, path string
 	routes       []*route
+	resp         *response
 }
 
-// TODO(tsileo): return method not authorized
+func (r *router) errorFunc(statusCode int, statusText string) {
+	r.resp.statusCode = statusCode
+	r.resp.body = bytes.NewBufferString(statusText)
+}
 
-func setupRouter(method, path string) func(*lua.LState) int {
+func setupRouter(resp *response, method, path string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
 		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 			"new": func(L *lua.LState) int {
@@ -75,7 +83,12 @@ func setupRouter(method, path string) func(*lua.LState) int {
 					routerMethods[strings.ToLower(m)] = routerMethodFunc(m)
 				}
 				L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), routerMethods))
-				router := &router{routes: []*route{}, method: method, path: path}
+				router := &router{
+					routes: []*route{},
+					method: method,
+					path:   path,
+					resp:   resp,
+				}
 				ud := L.NewUserData()
 				ud.Value = router
 				L.SetMetatable(ud, L.GetTypeMetatable("router"))
@@ -122,7 +135,20 @@ func routerRun(L *lua.LState) int {
 	if router == nil {
 		return 1
 	}
-	fn, params := router.match(router.method, router.path)
+	fn, params, err := router.match(router.method, router.path)
+	switch err {
+	case nil:
+	case errNotFound:
+		statusCode := http.StatusNotFound
+		router.errorFunc(statusCode, http.StatusText(statusCode))
+		return 0
+	case errMethodNotAllowed:
+		statusCode := http.StatusMethodNotAllowed
+		router.errorFunc(statusCode, http.StatusText(statusCode))
+		return 0
+	default:
+		panic(err)
+	}
 	p := map[string]interface{}{}
 	for k, v := range params {
 		p[k] = v
@@ -174,12 +200,19 @@ func (r *router) add(method, path string, data interface{}) {
 }
 
 // Match returns the given route data alog with the params if any matches
-func (r *router) match(method, path string) (interface{}, params) {
+func (r *router) match(method, path string) (interface{}, params, error) {
+	var methodNotAllowed bool
 	for _, rt := range r.routes {
-		match, params := rt.match(method, path)
-		if match {
-			return rt.data, params
+		match, params := rt.match(path)
+		if match && (rt.method == any || rt.method == method) {
+			return rt.data, params, nil
+		}
+		if match && rt.method != method {
+			methodNotAllowed = true
 		}
 	}
-	return nil, nil
+	if methodNotAllowed {
+		return nil, nil, errMethodNotAllowed
+	}
+	return nil, nil, errNotFound
 }
