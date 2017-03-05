@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"a4.io/blobstash/pkg/apps/luautil" // FIXME(tsileo): copy luatuil
 	"github.com/yuin/gopher-lua"
 )
 
@@ -155,7 +154,7 @@ func responseJsonify(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	js := luautil.ToJSON(L.CheckAny(2))
+	js := toJSON(L.CheckAny(2))
 	resp.body.Write(js)
 	resp.headers["Content-Type"] = "application/json"
 	return 0

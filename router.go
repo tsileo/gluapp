@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"strings"
 
-	"a4.io/blobstash/pkg/apps/luautil" // FIXME(tsileo): copy luatuil
 	"github.com/yuin/gopher-lua"
 )
 
@@ -157,7 +156,7 @@ func routerRun(L *lua.LState) int {
 		Fn:      lua.LValue(fn.(*lua.LFunction)),
 		NRet:    0,
 		Protect: true,
-	}, luautil.InterfaceToLValue(L, p)); err != nil {
+	}, interfaceToLValue(L, p)); err != nil {
 		panic(err)
 	}
 	return 0
