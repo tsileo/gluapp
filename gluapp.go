@@ -32,7 +32,7 @@ func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) err
 	if conf.Path != "" {
 		path := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
 		// TODO(tsileo): handle ending path in config.Path
-		path = config.Path + "/?.lua;" + path
+		path = lua.LString(conf.Path + "/?.lua;" + string(path))
 		L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
 	}
 
