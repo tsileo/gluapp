@@ -64,6 +64,8 @@ type router struct {
 }
 
 func (r *router) errorFunc(statusCode int, statusText string) {
+	// FIXME(tsileo): implement `router:error(function(statuscode, statustext) end)` and call it if set
+	// instea of writing the response.
 	r.resp.statusCode = statusCode
 	r.resp.body = bytes.NewBufferString(statusText)
 }

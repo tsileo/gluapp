@@ -8,6 +8,14 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+// TODO(tsileo): move request and response to their own file
+// TODO(tsileo): config for the path
+// TODO(tsileo): render go template via the path
+// TODO(tsileo): render public dir via whitelist, then execute the Lua app
+// TODO(tsileo): a logFunc(t time.Time, msg string, args ...interface{})?
+// TODO(tsileo): `body, resp, err = http:get('http://...')`
+// `body:json()`, resp.statuscode
+
 var methods = []string{
 	"GET", "POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT", "OPTIONS", "HEAD",
 }
@@ -24,7 +32,7 @@ func setupRequest(L *lua.LState, r *http.Request) error {
 		return err
 	}
 	req := &request{
-		uploadMaxMemory: 32 * 1024 * 1024,
+		uploadMaxMemory: 32 * 1024 * 1024, // FIXME(tsileo): move this to config
 		request:         r,
 		body:            body,
 	}
@@ -58,11 +66,11 @@ func setupResponse(L *lua.LState, w http.ResponseWriter) *response {
 	resp := &response{
 		body:       bytes.NewBuffer(nil),
 		statusCode: 200,
-		headers:    map[string]string{}, // FIXME(tsileo): copy actual resp headers from ResponseWriter
+		headers:    map[string]string{},
 		w:          w,
 	}
 	for header, val := range w.Header() {
-		// FIXME(tsileo): handle []string for header
+		// TODO(tsileo): handle []string for header
 		resp.headers[header] = val[0]
 	}
 
@@ -162,9 +170,18 @@ func responseJsonify(L *lua.LState) int {
 
 // Exec run the code as a Lua script
 func Exec(code string, w http.ResponseWriter, r *http.Request) error {
-	// TODO(tsileo): clean error
+	// TODO(tsileo): clean error, take L as argument
 	L := lua.NewState()
 	defer L.Close()
+
+	// Update the path if needed
+	// FIXME(tsileo): handle the path via config
+	// path, ok := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
+	// if ok {
+	// 	fmt.Printf("path=%s\n", path)
+	// }
+	// path = "/Users/thomas/gopath/src/github.com/tsileo/?.lua;" + path
+	// L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
 
 	// Setup `request`
 	if err := setupRequest(L, r); err != nil {
@@ -175,6 +192,9 @@ func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 
 	// Setup the `router` module
 	L.PreloadModule("router", setupRouter(resp, r.Method, r.URL.Path))
+	// TODO(tsileo):
+	// - json
+	// - http
 
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {
