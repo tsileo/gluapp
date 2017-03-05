@@ -69,7 +69,7 @@ func TestExec(t *testing.T) {
 			method:                     "GET",
 			server:                     servers["s2"],
 			path:                       "/hello/thomas/",
-			expectedResponseBody:       "hello /hello/thomas/", // FIXME(tsileo) fix the slash issue
+			expectedResponseBody:       "hello thomas",
 			expectedResponseStatusCode: 200,
 		},
 	}

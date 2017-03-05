@@ -1,12 +1,11 @@
-package gluapp
+package gluapp // import "a4.io/gluapp"
 
 import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
-	"a4.io/blobstash/pkg/apps/luautil"
+	"a4.io/blobstash/pkg/apps/luautil" // FIXME(tsileo): copy luatuil
 	"github.com/yuin/gopher-lua"
 )
 
@@ -14,106 +13,21 @@ var methods = []string{
 	"GET", "POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT", "OPTIONS", "HEAD",
 }
 
-const any = "any"
-
-type router struct {
-	r   *Router
-	req *http.Request
-}
-
-func setupRouter(req *http.Request) func(*lua.LState) int {
-	return func(L *lua.LState) int {
-		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-			"new": func(L *lua.LState) int {
-				mt := L.NewTypeMetatable("router")
-				// methods
-				routerMethods := map[string]lua.LGFunction{
-					"any": routerMethodFunc(any),
-					"run": routerRun,
-				}
-				for _, m := range methods {
-					routerMethods[strings.ToLower(m)] = routerMethodFunc(m)
-				}
-				L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), routerMethods))
-				router := &router{r: New(), req: req}
-				ud := L.NewUserData()
-				ud.Value = router
-				L.SetMetatable(ud, L.GetTypeMetatable("router"))
-				L.Push(ud)
-				return 1
-			},
-		})
-		L.Push(mod)
-		return 1
-	}
-}
-
-func checkRouter(L *lua.LState) *router {
-	ud := L.CheckUserData(1)
-	if v, ok := ud.Value.(*router); ok {
-		return v
-	}
-	L.ArgError(1, "router expected")
-	return nil
-}
-
-func routerMethodFunc(method string) func(*lua.LState) int {
-	return func(L *lua.LState) int {
-		router := checkRouter(L)
-		if router == nil {
-			return 1
-		}
-		path := string(L.CheckString(2))
-		fn := L.CheckFunction(3)
-		if method == "any" {
-			for _, m := range methods {
-				router.r.Add(m, path, fn)
-			}
-
-		} else {
-			router.r.Add(method, path, fn)
-		}
-		return 0
-	}
-}
-
-func routerRun(L *lua.LState) int {
-	router := checkRouter(L)
-	if router == nil {
-		return 1
-	}
-	fn, params := router.r.Match(router.req.Method, router.req.URL.Path)
-	p := map[string]interface{}{}
-	for k, v := range params {
-		p[k] = v
-	}
-	if err := L.CallByParam(lua.P{
-		Fn:      lua.LValue(fn.(*lua.LFunction)),
-		NRet:    0,
-		Protect: true,
-	}, luautil.InterfaceToLValue(L, p)); err != nil {
-		panic(err)
-	}
-	return 0
-}
-
 type request struct {
 	uploadMaxMemory int64
 	request         *http.Request
-	reqID           string
-	cache           []byte // Cache the body, since it can only be streamed once
+	body            []byte // Cache the body, since it can only be streamed once
 }
 
 func setupRequest(L *lua.LState, r *http.Request) error {
-	cache, err := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
-	// TODO(tsileo): reqID still nedeed?
 	req := &request{
 		uploadMaxMemory: 32 * 1024 * 1024,
 		request:         r,
-		cache:           cache,
+		body:            body,
 	}
 	mt := L.NewTypeMetatable("request")
 	// methods
@@ -272,7 +186,7 @@ func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 	resp := setupResponse(L, w)
 
 	// Setup the `router` module
-	L.PreloadModule("router", setupRouter(r))
+	L.PreloadModule("router", setupRouter(r.Method, r.URL.Path))
 
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {
