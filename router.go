@@ -1,13 +1,3 @@
-/*
-
-The Router implements a basic HTTP router that does not rely on `net/http` at all.
-
-It supports named parameters (`/hello/:name`), insertion order of routes does matter, the first matching route is
-returned.
-
-Designed to be used as router for luareq.
-
-*/
 package gluapp
 
 import (
@@ -56,7 +46,10 @@ func (r *route) match(path string) (bool, params) {
 	return false, nil
 }
 
-// Router represents the router and holds the routes.
+// The Router implements a basic HTTP router that does not rely on `net/http` at all.
+//
+// It supports named parameters (`/hello/:name`), insertion order of routes does matter, the first matching route is
+// returned.
 type router struct {
 	method, path string
 	routes       []*route

@@ -6,8 +6,7 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-// TODO(tsileo): move request and response to their own file
-// TODO(tsileo): config for the path
+// TODO(tsileo): a "app" wrapper that make tu public/tempalte dir/config path optional
 // TODO(tsileo): render go template via the path
 // TODO(tsileo): render public dir via whitelist, then execute the Lua app
 // TODO(tsileo): a logFunc(t time.Time, msg string, args ...interface{})?
@@ -18,20 +17,24 @@ var methods = []string{
 	"GET", "POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT", "OPTIONS", "HEAD",
 }
 
+// Config represents an app configuration
+type Config struct {
+	Path string
+}
+
 // Exec run the code as a Lua script
-func Exec(code string, w http.ResponseWriter, r *http.Request) error {
+func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) error {
 	// TODO(tsileo): clean error, take L as argument
 	L := lua.NewState()
 	defer L.Close()
 
 	// Update the path if needed
-	// FIXME(tsileo): handle the path via config
-	// path, ok := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
-	// if ok {
-	// 	fmt.Printf("path=%s\n", path)
-	// }
-	// path = "/Users/thomas/gopath/src/github.com/tsileo/?.lua;" + path
-	// L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
+	if conf.Path != "" {
+		path := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
+		// TODO(tsileo): handle ending path in config.Path
+		path = config.Path + "/?.lua;" + path
+		L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
+	}
 
 	// Setup `request`
 	if err := setupRequest(L, r); err != nil {
@@ -42,9 +45,9 @@ func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 
 	// Setup the `router` module
 	L.PreloadModule("router", setupRouter(resp, r.Method, r.URL.Path))
-	// TODO(tsileo):
-	// - json
-	// - http
+	L.PreloadModule("json", loadJSON)
+	L.PreloadModule("http", loadHTTP)
+	// TODO(tsileo): a read/write file module
 
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {

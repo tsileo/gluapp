@@ -23,13 +23,13 @@ router:run()
 
 func TestExec(t *testing.T) {
 	h1 := func(w http.ResponseWriter, r *http.Request) {
-		if err := Exec(testApp1, w, r); err != nil {
+		if err := Exec(&Config{}, testApp1, w, r); err != nil {
 			panic(err)
 		}
 	}
 
 	h2 := func(w http.ResponseWriter, r *http.Request) {
-		if err := Exec(testAppRouter1, w, r); err != nil {
+		if err := Exec(&Config{}, testAppRouter1, w, r); err != nil {
 			panic(err)
 		}
 	}
