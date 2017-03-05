@@ -82,13 +82,16 @@ func routerRun(L *lua.LState) int {
 	if router == nil {
 		return 1
 	}
-	// TODO(tsileo) get request struct from req object to do the match
-	fn, params := router.r.Match("GET", "/")
+	fn, params := router.r.Match(router.req.Method, router.req.URL.Path)
+	p := map[string]interface{}{}
+	for k, v := range params {
+		p[k] = v
+	}
 	if err := L.CallByParam(lua.P{
 		Fn:      lua.LValue(fn.(*lua.LFunction)),
 		NRet:    0,
 		Protect: true,
-	}, luautil.InterfaceToLValue(L, params)); err != nil {
+	}, luautil.InterfaceToLValue(L, p)); err != nil {
 		panic(err)
 	}
 	return 0
@@ -255,6 +258,7 @@ func responseJsonify(L *lua.LState) int {
 // router:run()
 // `
 
+// Exec run the code as a Lua script
 func Exec(code string, w http.ResponseWriter, r *http.Request) error {
 	// TODO(tsileo): clean error
 	L := lua.NewState()
