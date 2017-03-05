@@ -5,6 +5,16 @@
 
 HTTP framework for [GopherLua](https://github.com/yuin/gopher-lua).
 
+## Features
+
+ - Simple
+ - No 3rd party requirements except gopher-lua
+ - Rely on Go template language
+ - Same request/response idioms as Go HTTP lib
+ - Comes with a basic (and optional router)
+
+## Example
+
 ```lua
 local router = require('router').new()
 
