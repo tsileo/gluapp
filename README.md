@@ -5,8 +5,7 @@
 
 HTTP framework for [GopherLua](https://github.com/yuin/gopher-lua).
 
-lua
-```
+```lua
 local router = require('router').new()
 
 router:get('/hello/:name', function(params)
@@ -14,5 +13,4 @@ router:get('/hello/:name', function(params)
 end)
 
 router:run()
-
 ```
