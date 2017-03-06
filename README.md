@@ -11,8 +11,9 @@ HTTP framework for [GopherLua](https://github.com/yuin/gopher-lua).
  - No 3rd party requirements except gopher-lua
  - Rely on Go template language
  - Same request/response idioms as Go HTTP lib
- - Comes with a basic (and optional router)
+ - Comes with a basic (and optional) router
  - First-class JSON support
+ - Included HTTP client
 
 ## Example
 
