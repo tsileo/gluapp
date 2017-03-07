@@ -65,18 +65,20 @@ func (r *router) errorFunc(statusCode int, statusText string) {
 
 func setupRouter(resp *response, method, path string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
+		// Setup the Lua meta table for the router user-defined type
+		mt := L.NewTypeMetatable("router")
+		routerMethods := map[string]lua.LGFunction{
+			"any": routerMethodFunc(any),
+			"run": routerRun,
+		}
+		for _, m := range methods {
+			routerMethods[strings.ToLower(m)] = routerMethodFunc(m)
+		}
+		L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), routerMethods))
+
+		// Setup the router module
 		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 			"new": func(L *lua.LState) int {
-				mt := L.NewTypeMetatable("router")
-				// methods
-				routerMethods := map[string]lua.LGFunction{
-					"any": routerMethodFunc(any),
-					"run": routerRun,
-				}
-				for _, m := range methods {
-					routerMethods[strings.ToLower(m)] = routerMethodFunc(m)
-				}
-				L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), routerMethods))
 				router := &router{
 					routes: []*route{},
 					method: method,

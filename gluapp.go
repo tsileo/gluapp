@@ -10,8 +10,6 @@ import (
 // TODO(tsileo): render go template via the path
 // TODO(tsileo): render public dir via whitelist, then execute the Lua app
 // TODO(tsileo): a logFunc(t time.Time, msg string, args ...interface{})?
-// TODO(tsileo): `body, resp, err = http:get('http://...')`
-// `body:json()`, resp.statuscode
 
 var methods = []string{
 	"GET", "POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT", "OPTIONS", "HEAD",
@@ -19,7 +17,15 @@ var methods = []string{
 
 // Config represents an app configuration
 type Config struct {
+	// Path for looking up resources (Lua files, templates, public assets)
 	Path string
+
+	// HTTP client, if not set, `http.DefaultClient` will be used
+	Client *http.Client
+}
+
+func setupState(L *lua.LState) {
+
 }
 
 // Exec run the code as a Lua script
@@ -31,23 +37,36 @@ func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) err
 	// Update the path if needed
 	if conf.Path != "" {
 		path := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
-		// TODO(tsileo): handle ending path in config.Path
 		path = lua.LString(conf.Path + "/?.lua;" + string(path))
 		L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
 	}
 
 	// Setup `request`
-	if err := setupRequest(L, r); err != nil {
+	req, err := newRequest(L, r)
+	if err != nil {
 		return err
 	}
 	// Initialize `response`
-	resp := setupResponse(L, w)
+	resp, lresp := newResponse(L, w)
+
+	rootTable := L.CreateTable(0, 2)
+	rootTable.RawSetH(lua.LString("request"), req)
+	rootTable.RawSetH(lua.LString("response"), resp)
+	L.SetGlobal("gluapp", rootTable)
 
 	// Setup the `router` module
-	L.PreloadModule("router", setupRouter(resp, r.Method, r.URL.Path))
+	L.PreloadModule("router", setupRouter(lresp, r.Method, r.URL.Path))
 	L.PreloadModule("json", loadJSON)
-	L.PreloadModule("http", loadHTTP)
-	// TODO(tsileo): a read/write file module
+
+	client := conf.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	L.PreloadModule("http", setupHTTP(client))
+
+	L.PreloadModule("form", setupForm()) // must be executed after setupHTTP
+	L.PreloadModule("template", setupTemplate())
+	// TODO(tsileo): a read/write file module???
 
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {
@@ -55,7 +74,7 @@ func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) err
 	}
 
 	// Write `response` content to the HTTP response
-	resp.apply()
+	lresp.apply()
 
 	return nil
 }

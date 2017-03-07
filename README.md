@@ -21,7 +21,7 @@ HTTP framework for [GopherLua](https://github.com/yuin/gopher-lua).
 local router = require('router').new()
 
 router:get('/hello/:name', function(params)
-  response:write('hello ' .. params.name)
+  gluapp.response:write('hello ' .. params.name)
 end)
 
 router:run()

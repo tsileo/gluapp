@@ -6,16 +6,47 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/yuin/gopher-lua"
 )
 
+// logf will allow to call t.Logf directly from Lua code
+func logf(t *testing.T) func(*lua.LState) int {
+	return func(L *lua.LState) int {
+		var args []interface{}
+		for i := 2; i <= L.GetTop(); i++ {
+			args = append(args, L.CheckAny(i))
+		}
+		t.Logf(string(L.ToString(1)), args...)
+		return 0
+	}
+}
+
+// errorf will allow to call t.Logf directly from Lua code
+func errorf(t *testing.T) func(*lua.LState) int {
+	return func(L *lua.LState) int {
+		var args []interface{}
+		for i := 2; i <= L.GetTop(); i++ {
+			args = append(args, L.CheckAny(i))
+		}
+		t.Errorf(string(L.ToString(1)), args...)
+		return 0
+	}
+}
+
+func setupTestState(L *lua.LState, t *testing.T) {
+	L.SetGlobal("logf", L.NewFunction(logf(t)))
+	L.SetGlobal("errorf", L.NewFunction(errorf(t)))
+}
+
 var testApp1 = `
-response:write('Hello World!')
+gluapp.response:write('Hello World!')
 `
 
 var testAppRouter1 = `
 router = require('router').new()
 router:get('/hello/:name', function(params)
-  response:write('hello ' .. params.name)
+  gluapp.response:write('hello ' .. params.name)
   print('hello')
 end)
 router:run()

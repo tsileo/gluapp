@@ -7,6 +7,7 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+// response represents the HTTP response
 type response struct {
 	body       *bytes.Buffer
 	headers    map[string]string
@@ -22,11 +23,11 @@ func (resp *response) apply() {
 	resp.w.Write(resp.body.Bytes())
 }
 
-func setupResponse(L *lua.LState, w http.ResponseWriter) *response {
+func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *response) {
 	resp := &response{
 		body:       bytes.NewBuffer(nil),
 		statusCode: 200,
-		headers:    map[string]string{},
+		headers:    map[string]string{}, // FIXME(tsileo): use http.Header
 		w:          w,
 	}
 	for header, val := range w.Header() {
@@ -48,8 +49,7 @@ func setupResponse(L *lua.LState, w http.ResponseWriter) *response {
 	ud := L.NewUserData()
 	ud.Value = resp
 	L.SetMetatable(ud, L.GetTypeMetatable("response"))
-	L.SetGlobal("response", ud)
-	return resp
+	return ud, resp
 }
 
 func checkResponse(L *lua.LState) *response {
