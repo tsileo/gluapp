@@ -11,34 +11,14 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-// TODO(tsileo): an helper for buiding form values
-
 func setupHTTP(client *http.Client) func(*lua.LState) int {
 	return func(L *lua.LState) int {
-		// Setup the Lua meta table for the respBody user-defined type
-		mtRespBody := L.NewTypeMetatable("respBody")
-		L.SetField(mtRespBody, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-			"text": respBodyText,
-			"size": respBodySize,
-			"json": respBodyJSON,
-		}))
-
-		// Setup the Lua meta table for the headers user-defined type
-		mtHeaders := L.NewTypeMetatable("values")
-		L.SetField(mtHeaders, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-			"add": headersAdd,
-			"set": headersSet,
-			"del": headersDel,
-			"get": headersGet,
-			"raw": headersRaw,
-		}))
-
 		// Setup the Lua meta table the http (client) user-defined type
 		mtHTTP := L.NewTypeMetatable("http")
 		clientMethods := map[string]lua.LGFunction{
 			"headers": func(L *lua.LState) int {
 				client := checkHTTPClient(L)
-				headers := buildValues(L, client.header)
+				headers := buildHeaders(L, client.header)
 				L.Push(headers)
 				return 1
 			},
@@ -106,15 +86,16 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 				header.Set("Content-Type", "application/json")
 				body = bytes.NewReader(toJSON(L.Get(3)))
 			case *lua.LUserData:
-				if h, ok := lv.Value.(*headers); ok {
+				if h, ok := lv.Value.(*values); ok {
 					header.Set("Content-Type", "application/x-www-form-urlencoded")
-					body = strings.NewReader(url.Values(h.header).Encode())
+					body = strings.NewReader(h.values.Encode())
 				}
 			default:
 				// TODO(tsileo): return an error
 			}
 		}
 
+		// Create the request
 		request, err := http.NewRequest(method, rurl, body)
 		if err != nil {
 			L.Push(lua.LNil)
@@ -162,7 +143,7 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 		out := L.CreateTable(0, 5)
 		out.RawSetH(lua.LString("status_code"), lua.LNumber(float64(resp.StatusCode)))
 		out.RawSetH(lua.LString("status_line"), lua.LString(resp.Status))
-		out.RawSetH(lua.LString("headers"), buildValues(L, resp.Header))
+		out.RawSetH(lua.LString("headers"), buildHeaders(L, resp.Header))
 		out.RawSetH(lua.LString("proto"), lua.LString(resp.Proto))
 		out.RawSetH(lua.LString("body"), buildRespBody(L, rbody))
 
@@ -213,21 +194,13 @@ func respBodyText(L *lua.LState) int {
 }
 
 // respBody is a custom type for holding the response body
-// TODO(tsileo): use map[string][]string ?
 type headers struct {
 	header http.Header
 }
 
-func initHeaders(L *lua.LState) {
-	mt := L.NewTypeMetatable("values")
-	// methods
-	L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"add": headersAdd,
-		"set": headersSet,
-		"del": headersDel,
-		"get": headersGet,
-		"raw": headersRaw,
-	}))
+// values holds query parameters or form data
+type values struct {
+	values url.Values
 }
 
 func setupForm() func(*lua.LState) int {
@@ -236,7 +209,7 @@ func setupForm() func(*lua.LState) int {
 		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 			"new": func(L *lua.LState) int {
 				ud := L.NewUserData()
-				ud.Value = &headers{http.Header{}}
+				ud.Value = &values{url.Values{}}
 				L.SetMetatable(ud, L.GetTypeMetatable("values"))
 				L.Push(ud)
 				return 1
@@ -247,11 +220,27 @@ func setupForm() func(*lua.LState) int {
 	}
 }
 
-func buildValues(L *lua.LState, header http.Header) lua.LValue {
+func buildValues(L *lua.LState, vals url.Values) lua.LValue {
 	ud := L.NewUserData()
-	ud.Value = &headers{header}
+	ud.Value = &values{vals}
 	L.SetMetatable(ud, L.GetTypeMetatable("values"))
 	return ud
+}
+
+func buildHeaders(L *lua.LState, header http.Header) lua.LValue {
+	ud := L.NewUserData()
+	ud.Value = &headers{header}
+	L.SetMetatable(ud, L.GetTypeMetatable("headers"))
+	return ud
+}
+
+func checkValues(L *lua.LState) *values {
+	ud := L.CheckUserData(1)
+	if v, ok := ud.Value.(*values); ok {
+		return v
+	}
+	L.ArgError(1, "values expected")
+	return nil
 }
 
 func checkHeaders(L *lua.LState) *headers {
@@ -259,7 +248,7 @@ func checkHeaders(L *lua.LState) *headers {
 	if v, ok := ud.Value.(*headers); ok {
 		return v
 	}
-	L.ArgError(1, "values expected")
+	L.ArgError(1, "headers expected")
 	return nil
 }
 
@@ -291,6 +280,45 @@ func headersRaw(L *lua.LState) int {
 	headers := checkHeaders(L)
 	out := L.CreateTable(0, len(headers.header))
 	for k, vs := range headers.header {
+		values := L.CreateTable(len(vs), 0)
+		for _, v := range vs {
+			values.Append(lua.LString(v))
+		}
+		out.RawSetH(lua.LString(k), values)
+	}
+	L.Push(out)
+	return 1
+}
+
+func valuesAdd(L *lua.LState) int {
+	values := checkValues(L)
+	values.values.Add(string(L.ToString(2)), string(L.ToString(3)))
+	return 0
+}
+
+func valuesSet(L *lua.LState) int {
+	values := checkValues(L)
+	values.values.Set(string(L.ToString(2)), string(L.ToString(3)))
+	return 0
+}
+
+func valuesDel(L *lua.LState) int {
+	values := checkValues(L)
+	values.values.Del(string(L.ToString(2)))
+	return 0
+}
+
+func valuesGet(L *lua.LState) int {
+	values := checkValues(L)
+	val := values.values.Get(string(L.ToString(2)))
+	L.Push(lua.LString(val))
+	return 1
+}
+
+func valuesRaw(L *lua.LState) int {
+	values := checkValues(L)
+	out := L.CreateTable(0, len(values.values))
+	for k, vs := range values.values {
 		values := L.CreateTable(len(vs), 0)
 		for _, v := range vs {
 			values.Append(lua.LString(v))

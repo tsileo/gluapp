@@ -35,18 +35,19 @@ func errorf(t *testing.T) func(*lua.LState) int {
 }
 
 func setupTestState(L *lua.LState, t *testing.T) {
+	setupMetatable(L)
 	L.SetGlobal("logf", L.NewFunction(logf(t)))
 	L.SetGlobal("errorf", L.NewFunction(errorf(t)))
 }
 
 var testApp1 = `
-gluapp.response:write('Hello World!')
+app.response:write('Hello World!')
 `
 
 var testAppRouter1 = `
 router = require('router').new()
 router:get('/hello/:name', function(params)
-  gluapp.response:write('hello ' .. params.name)
+  app.response:write('hello ' .. params.name)
   print('hello')
 end)
 router:run()
@@ -74,6 +75,7 @@ func TestExec(t *testing.T) {
 		defer server.Close()
 	}
 
+	// TODO(tsileo): also test headers
 	testData := []struct {
 		server                     *httptest.Server
 		method                     string

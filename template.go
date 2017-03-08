@@ -3,12 +3,12 @@ package gluapp
 import (
 	"bytes"
 	"html/template"
+	"path/filepath"
 
 	"github.com/yuin/gopher-lua"
 )
 
-// template.Must(template.ParseGlob("YOURTEMPLATEDIR/*"))
-func setupTemplate() func(*lua.LState) int {
+func setupTemplate(path string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
 		// Setup the router module
 		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
@@ -20,8 +20,32 @@ func setupTemplate() func(*lua.LState) int {
 					return 0
 				}
 				if err := tpl.Execute(&out, tableToMap(L.ToTable(2))); err != nil {
-					return 0
+					L.Push(lua.LString(err.Error()))
+					return 1
 				}
+				L.Push(lua.LString(out.String()))
+				return 1
+			},
+			"render": func(L *lua.LState) int {
+				var out bytes.Buffer
+
+				var templates []string
+				for i := 1; i < L.GetTop(); i++ {
+					templates = append(templates, filepath.Join(path, string(L.ToString(i))))
+				}
+
+				tmpl, err := template.New("").ParseFiles(templates...)
+				if err != nil {
+					L.Push(lua.LString(err.Error()))
+					return 1
+				}
+				tmplName := filepath.Base(templates[len(templates)-1])
+				ctx := tableToMap(L.ToTable(L.GetTop()))
+				if err := tmpl.ExecuteTemplate(&out, tmplName, ctx); err != nil {
+					L.Push(lua.LString(err.Error()))
+					return 1
+				}
+
 				L.Push(lua.LString(out.String()))
 				return 1
 			},
