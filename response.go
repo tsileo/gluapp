@@ -10,15 +10,26 @@ import (
 // response represents the HTTP response
 type response struct {
 	body       *bytes.Buffer
-	headers    map[string]string
+	headers    http.Header
 	statusCode int
 	w          http.ResponseWriter
 }
 
 func (resp *response) apply() {
-	for header, val := range resp.headers {
-		resp.w.Header().Set(header, val)
+	// Write the headers
+	for k, vs := range resp.headers {
+		// Reset existing values
+		resp.w.Header().Del(k)
+		if len(vs) == 1 {
+			resp.w.Header().Set(k, resp.headers.Get(k))
+		}
+		if len(vs) > 1 {
+			for _, v := range vs {
+				resp.w.Header().Add(k, v)
+			}
+		}
 	}
+
 	resp.w.WriteHeader(resp.statusCode)
 	resp.w.Write(resp.body.Bytes())
 }
@@ -27,23 +38,28 @@ func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *respons
 	resp := &response{
 		body:       bytes.NewBuffer(nil),
 		statusCode: 200,
-		headers:    map[string]string{}, // FIXME(tsileo): use http.Header
+		headers:    http.Header{},
 		w:          w,
 	}
-	for header, val := range w.Header() {
-		// TODO(tsileo): handle []string for header
-		resp.headers[header] = val[0]
+
+	// Copy the headers already set in the response
+	for header, vals := range w.Header() {
+		for _, v := range vals {
+			resp.headers.Add(header, v)
+		}
 	}
 
+	// FIXME(tsileo): set the metatable only once?
 	mt := L.NewTypeMetatable("response")
 	// methods
 	responseMethods := map[string]lua.LGFunction{
-		"status":       responseStatus,
-		"header":       responseHeader, // FIXME(tsileo): add "headers" and return a table with resp
-		"write":        responseWrite,
-		"error":        responseError,
-		"authenticate": responseAuthenticate,
-		"jsonify":      responseJsonify,
+		"set_status": responseStatus,
+		"headers":    responseHeaders,
+		"write":      responseWrite,
+		"jsonify":    responseJsonify,
+		"error":      responseError,
+		// TODO(tsileo): see how to deal with basic auth
+		// "authenticate": responseAuthenticate,
 	}
 	L.SetField(mt, "__index", L.SetFuncs(L.NewTable(), responseMethods))
 	ud := L.NewUserData()
@@ -79,14 +95,13 @@ func responseWrite(L *lua.LState) int {
 	return 0
 }
 
-func responseHeader(L *lua.LState) int {
+func responseHeaders(L *lua.LState) int {
 	resp := checkResponse(L)
 	if resp == nil {
 		return 1
 	}
-	// TODO(tsileo): return the header if no 3rd arg is provided
-	resp.headers[L.ToString(2)] = L.ToString(3)
-	return 0
+	L.Push(buildHeaders(L, resp.headers))
+	return 1
 }
 
 func responseError(L *lua.LState) int {
@@ -113,7 +128,7 @@ func responseAuthenticate(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	resp.headers["WWW-Authenticate"] = "Basic realm=\"" + L.ToString(2) + "\""
+	resp.headers.Set("WWW-Authenticate", "Basic realm=\""+L.ToString(2)+"\"")
 	return 0
 }
 
@@ -124,6 +139,6 @@ func responseJsonify(L *lua.LState) int {
 	}
 	js := toJSON(L.CheckAny(2))
 	resp.body.Write(js)
-	resp.headers["Content-Type"] = "application/json"
+	resp.headers.Set("Content-Type", "application/json")
 	return 0
 }

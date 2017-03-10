@@ -145,7 +145,7 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 		out.RawSetH(lua.LString("status_line"), lua.LString(resp.Status))
 		out.RawSetH(lua.LString("headers"), buildHeaders(L, resp.Header))
 		out.RawSetH(lua.LString("proto"), lua.LString(resp.Proto))
-		out.RawSetH(lua.LString("body"), buildRespBody(L, rbody))
+		out.RawSetH(lua.LString("body"), buildBody(L, rbody))
 
 		L.Push(out)
 		L.Push(lua.LNil)
@@ -153,43 +153,43 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 	}
 }
 
-// respBody is a custom type for holding the response body
-type respBody struct {
-	body []byte
+// body is a custom type for holding requests/responses body
+type body struct {
+	data []byte
 }
 
-func buildRespBody(L *lua.LState, body []byte) lua.LValue {
+func buildBody(L *lua.LState, data []byte) lua.LValue {
 	ud := L.NewUserData()
-	ud.Value = &respBody{body}
-	L.SetMetatable(ud, L.GetTypeMetatable("respBody"))
+	ud.Value = &body{data}
+	L.SetMetatable(ud, L.GetTypeMetatable("body"))
 	return ud
 }
 
-func checkRespBody(L *lua.LState) *respBody {
+func checkBody(L *lua.LState) *body {
 	ud := L.CheckUserData(1)
-	if v, ok := ud.Value.(*respBody); ok {
+	if v, ok := ud.Value.(*body); ok {
 		return v
 	}
 	L.ArgError(1, "respBody expected")
 	return nil
 }
 
-func respBodySize(L *lua.LState) int {
-	respBody := checkRespBody(L)
-	L.Push(lua.LNumber(float64(len(respBody.body))))
+func bodySize(L *lua.LState) int {
+	body := checkBody(L)
+	L.Push(lua.LNumber(float64(len(body.data))))
 	return 1
 }
 
-func respBodyJSON(L *lua.LState) int {
-	respBody := checkRespBody(L)
+func bodyJSON(L *lua.LState) int {
+	body := checkBody(L)
 	// TODO(tsileo): improve from JSON when the payload is invalid
-	L.Push(fromJSON(L, respBody.body))
+	L.Push(fromJSON(L, body.data))
 	return 1
 }
 
-func respBodyText(L *lua.LState) int {
-	respBody := checkRespBody(L)
-	L.Push(lua.LString(string(respBody.body)))
+func bodyText(L *lua.LState) int {
+	body := checkBody(L)
+	L.Push(lua.LString(string(body.data)))
 	return 1
 }
 

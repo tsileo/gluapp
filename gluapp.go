@@ -38,11 +38,11 @@ type Config struct {
 // Setup "global" metatable (used by multiple modules)
 func setupMetatable(L *lua.LState) {
 	// Setup the Lua meta table for the respBody user-defined type
-	mtRespBody := L.NewTypeMetatable("respBody")
+	mtRespBody := L.NewTypeMetatable("body")
 	L.SetField(mtRespBody, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"text": respBodyText,
-		"size": respBodySize,
-		"json": respBodyJSON,
+		"text": bodyText,
+		"size": bodySize,
+		"json": bodyJSON,
 	}))
 
 	// Setup the Lua meta table for the headers user-defined type

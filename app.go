@@ -35,7 +35,7 @@ func NewApp(conf *Config) (*App, error) {
 		appEntrypoint: appPath,
 	}
 
-	// If there's a public dir, fetch the list of files
+	// If there's a public dir, fetch the list of files and keep them in an index
 	publicPath, err := filepath.Abs(filepath.Join(conf.Path, "public"))
 	if err != nil {
 		return nil, err
