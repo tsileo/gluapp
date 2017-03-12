@@ -66,7 +66,7 @@ func setupMetatable(L *lua.LState) {
 	}))
 }
 
-func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Request) (*response, error) {
+func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Request) (*Response, error) {
 	// Update the path if needed
 	if conf.Path != "" {
 		path := L.GetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path").(lua.LString)
@@ -135,7 +135,7 @@ func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) err
 	}
 
 	// Write `response` content to the HTTP response
-	resp.apply()
+	resp.WriteTo(w)
 
 	return nil
 }

@@ -7,45 +7,50 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-// response represents the HTTP response
-type response struct {
-	body       *bytes.Buffer
-	headers    http.Header
-	statusCode int
-	w          http.ResponseWriter
+// Response represents the HTTP response
+type Response struct {
+	buf        *bytes.Buffer
+	Body       []byte
+	Header     http.Header
+	StatusCode int
 }
 
-func (resp *response) apply() {
-	// Write the headers
-	for k, vs := range resp.headers {
-		// Reset existing values
-		resp.w.Header().Del(k)
-		if len(vs) == 1 {
-			resp.w.Header().Set(k, resp.headers.Get(k))
-		}
-		if len(vs) > 1 {
-			for _, v := range vs {
-				resp.w.Header().Add(k, v)
+// WriteTo dumps the respons to the actual  response.
+func (resp *Response) WriteTo(w http.ResponseWriter) {
+	resp.Body = resp.buf.Bytes()
+	resp.buf = nil
+
+	if w != nil {
+		// Write the headers
+		for k, vs := range resp.Header {
+			// Reset existing values
+			w.Header().Del(k)
+			if len(vs) == 1 {
+				w.Header().Set(k, resp.Header.Get(k))
+			}
+			if len(vs) > 1 {
+				for _, v := range vs {
+					w.Header().Add(k, v)
+				}
 			}
 		}
-	}
 
-	resp.w.WriteHeader(resp.statusCode)
-	resp.w.Write(resp.body.Bytes())
+		w.WriteHeader(resp.StatusCode)
+		w.Write(resp.Body)
+	}
 }
 
-func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *response) {
-	resp := &response{
-		body:       bytes.NewBuffer(nil),
-		statusCode: 200,
-		headers:    http.Header{},
-		w:          w,
+func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *Response) {
+	resp := &Response{
+		buf:        bytes.NewBuffer(nil),
+		StatusCode: 200,
+		Header:     http.Header{},
 	}
 
 	// Copy the headers already set in the response
 	for header, vals := range w.Header() {
 		for _, v := range vals {
-			resp.headers.Add(header, v)
+			resp.Header.Add(header, v)
 		}
 	}
 
@@ -68,9 +73,9 @@ func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *respons
 	return ud, resp
 }
 
-func checkResponse(L *lua.LState) *response {
+func checkResponse(L *lua.LState) *Response {
 	ud := L.CheckUserData(1)
-	if v, ok := ud.Value.(*response); ok {
+	if v, ok := ud.Value.(*Response); ok {
 		return v
 	}
 	L.ArgError(1, "response expected")
@@ -82,7 +87,7 @@ func responseStatus(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	resp.statusCode = L.ToInt(2)
+	resp.StatusCode = L.ToInt(2)
 	return 0
 }
 
@@ -91,7 +96,7 @@ func responseWrite(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	resp.body.WriteString(L.ToString(2))
+	resp.buf.WriteString(L.ToString(2))
 	return 0
 }
 
@@ -100,7 +105,7 @@ func responseHeaders(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	L.Push(buildHeaders(L, resp.headers))
+	L.Push(buildHeaders(L, resp.Header))
 	return 1
 }
 
@@ -110,7 +115,7 @@ func responseError(L *lua.LState) int {
 		return 1
 	}
 	status := int(L.ToNumber(2))
-	resp.statusCode = status
+	resp.StatusCode = status
 
 	var message string
 	if L.GetTop() == 3 {
@@ -118,8 +123,8 @@ func responseError(L *lua.LState) int {
 	} else {
 		message = http.StatusText(status)
 	}
-	resp.body.Reset()
-	resp.body.WriteString(message)
+	resp.buf.Reset()
+	resp.buf.WriteString(message)
 	return 0
 }
 
@@ -128,7 +133,7 @@ func responseAuthenticate(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	resp.headers.Set("WWW-Authenticate", "Basic realm=\""+L.ToString(2)+"\"")
+	resp.Header.Set("WWW-Authenticate", "Basic realm=\""+L.ToString(2)+"\"")
 	return 0
 }
 
@@ -138,7 +143,7 @@ func responseJsonify(L *lua.LState) int {
 		return 1
 	}
 	js := toJSON(L.CheckAny(2))
-	resp.body.Write(js)
-	resp.headers.Set("Content-Type", "application/json")
+	resp.buf.Write(js)
+	resp.Header.Set("Content-Type", "application/json")
 	return 0
 }

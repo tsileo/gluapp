@@ -62,13 +62,17 @@ func NewApp(conf *Config) (*App, error) {
 	return app, nil
 }
 
-func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// Exec executes the app in the given context, but it does not write the output to the `http.ResponseWriter`,
+// you need to call `Response.WriteTo(w)` manually.
+//
+// Most of the time, you should use `App` as a `http.HandlerFunc` (or call `App.ServeHTTP` manually).
+func (a *App) Exec(w http.ResponseWriter, r *http.Request) (*Response, error) {
 	path := r.URL.Path
 
 	// First check if there the request match a file in public/
 	if _, ok := a.publicIndex[path]; ok {
 		http.ServeFile(w, r, filepath.Join(a.conf.Path, "public", path))
-		return
+		return nil, nil
 	}
 
 	// Initialize a Lua state
@@ -78,15 +82,23 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Preload all the modules and setup global variables
 	resp, err := setupState(L, a.conf, w, r)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// Now we can execute the app entrypoint `app.lua`
 	if err := L.DoFile(a.appEntrypoint); err != nil {
 		// TODO(tsileo): display a nice stack trace in debug mode
+		return nil, err
+	}
+	return resp, nil
+}
+
+// ServeHTTP implements the `http.HandlerFunc` interface.
+func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	resp, err := a.Exec(w, r)
+	if err != nil {
 		panic(err)
 	}
-
 	// Write the request
-	resp.apply()
+	resp.WriteTo(w)
 }

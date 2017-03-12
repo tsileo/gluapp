@@ -53,17 +53,17 @@ func (r *route) match(path string) (bool, params) {
 type router struct {
 	method, path string
 	routes       []*route
-	resp         *response
+	resp         *Response
 }
 
 func (r *router) errorFunc(statusCode int, statusText string) {
 	// FIXME(tsileo): implement `router:error(function(statuscode, statustext) end)` and call it if set
 	// instea of writing the response.
-	r.resp.statusCode = statusCode
-	r.resp.body = bytes.NewBufferString(statusText)
+	r.resp.StatusCode = statusCode
+	r.resp.buf = bytes.NewBufferString(statusText)
 }
 
-func setupRouter(resp *response, method, path string) func(*lua.LState) int {
+func setupRouter(resp *Response, method, path string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
 		// Setup the Lua meta table for the router user-defined type
 		mt := L.NewTypeMetatable("router")
