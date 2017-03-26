@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/yuin/gopher-lua"
+
+	"a4.io/blobstash/pkg/apps/luautil"
 )
 
 // Response represents the HTTP response
@@ -17,8 +19,10 @@ type Response struct {
 
 // WriteTo dumps the respons to the actual  response.
 func (resp *Response) WriteTo(w http.ResponseWriter) {
-	resp.Body = resp.buf.Bytes()
-	resp.buf = nil
+	if resp.buf != nil {
+		resp.Body = resp.buf.Bytes()
+		resp.buf = nil
+	}
 
 	if w != nil {
 		// Write the headers
@@ -142,7 +146,7 @@ func responseJsonify(L *lua.LState) int {
 	if resp == nil {
 		return 1
 	}
-	js := toJSON(L.CheckAny(2))
+	js := luautil.ToJSON(L.CheckAny(2))
 	resp.buf.Write(js)
 	resp.Header.Set("Content-Type", "application/json")
 	return 0

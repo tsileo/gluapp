@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 
+	"a4.io/blobstash/pkg/apps/luautil"
+
 	"github.com/yuin/gopher-lua"
 )
 
@@ -84,7 +86,7 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 				body = strings.NewReader(string(lv))
 			case *lua.LTable:
 				header.Set("Content-Type", "application/json")
-				body = bytes.NewReader(toJSON(L.Get(3)))
+				body = bytes.NewReader(luautil.ToJSON(L.Get(3)))
 			case *lua.LUserData:
 				if h, ok := lv.Value.(*values); ok {
 					header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -183,7 +185,7 @@ func bodySize(L *lua.LState) int {
 func bodyJSON(L *lua.LState) int {
 	body := checkBody(L)
 	// TODO(tsileo): improve from JSON when the payload is invalid
-	L.Push(fromJSON(L, body.data))
+	L.Push(luautil.FromJSON(L, body.data))
 	return 1
 }
 

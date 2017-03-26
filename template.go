@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"path/filepath"
 
+	"a4.io/blobstash/pkg/apps/luautil"
+
 	"github.com/yuin/gopher-lua"
 )
 
@@ -19,7 +21,7 @@ func setupTemplate(path string) func(*lua.LState) int {
 					// TODO(tsileo): return error?
 					return 0
 				}
-				if err := tpl.Execute(&out, tableToMap(L.ToTable(2))); err != nil {
+				if err := tpl.Execute(&out, luautil.TableToMap(L.ToTable(2))); err != nil {
 					L.Push(lua.LString(err.Error()))
 					return 1
 				}
@@ -40,7 +42,7 @@ func setupTemplate(path string) func(*lua.LState) int {
 					return 1
 				}
 				tmplName := filepath.Base(templates[len(templates)-1])
-				ctx := tableToMap(L.ToTable(L.GetTop()))
+				ctx := luautil.TableToMap(L.ToTable(L.GetTop()))
 				if err := tmpl.ExecuteTemplate(&out, tmplName, ctx); err != nil {
 					L.Push(lua.LString(err.Error()))
 					return 1

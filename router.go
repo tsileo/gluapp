@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/yuin/gopher-lua"
+
+	"a4.io/blobstash/pkg/apps/luautil"
 )
 
 const any = "any"
@@ -153,7 +155,7 @@ func routerRun(L *lua.LState) int {
 		Fn:      lua.LValue(fn.(*lua.LFunction)),
 		NRet:    0,
 		Protect: true,
-	}, interfaceToLValue(L, p)); err != nil {
+	}, luautil.InterfaceToLValue(L, p)); err != nil {
 		panic(err)
 	}
 	return 0
