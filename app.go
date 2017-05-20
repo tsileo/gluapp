@@ -90,6 +90,13 @@ func (a *App) Exec(w http.ResponseWriter, r *http.Request) (*Response, error) {
 		// TODO(tsileo): display a nice stack trace in debug mode
 		return nil, err
 	}
+
+	if a.conf.AfterScriptExecHook != nil {
+		if err := a.conf.AfterScriptExecHook(L); err != nil {
+			return nil, err
+		}
+	}
+
 	return resp, nil
 }
 
@@ -99,6 +106,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+
 	// Write the request
 	resp.WriteTo(w)
 }

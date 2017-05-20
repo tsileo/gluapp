@@ -31,6 +31,9 @@ type Config struct {
 	// Hook for adding/setting additional modules/global variables
 	SetupState func(L *lua.LState) error
 
+	// Hook executed just after the script execution, just before the request is written
+	AfterScriptExecHook func(L *lua.LState) error
+
 	// Stack trace will be displayed in debug mode
 	Debug bool
 }
@@ -132,6 +135,12 @@ func Exec(conf *Config, code string, w http.ResponseWriter, r *http.Request) err
 	// Execute the Lua code
 	if err := L.DoString(code); err != nil {
 		return err
+	}
+
+	if conf.AfterScriptExecHook != nil {
+		if err := conf.AfterScriptExecHook(L); err != nil {
+			return err
+		}
 	}
 
 	// Write `response` content to the HTTP response
