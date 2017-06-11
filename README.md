@@ -14,6 +14,7 @@ HTTP framework for [GopherLua](https://github.com/yuin/gopher-lua).
  - Comes with a basic (and optional) router
  - First-class JSON support
  - Included HTTP client
+ - Support importing dependency from GitHub on the fly with [require2](https://github.com/tsileo/gluarequire2)
 
 ## Example
 

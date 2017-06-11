@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"a4.io/gluarequire2"
+
 	"github.com/yuin/gopher-lua"
 )
 
@@ -76,6 +78,9 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 		path = lua.LString(conf.Path + "/?.lua;" + string(path))
 		L.SetField(L.GetField(L.Get(lua.EnvironIndex), "package"), "path", lua.LString(path))
 	}
+
+	// Setup `require2`
+	gluarequire2.NewRequire2Module(gluarequire2.NewRequireFromGitHub(nil)).SetGlobal(L)
 
 	// Setup shared Lua metatables
 	setupMetatable(L)
