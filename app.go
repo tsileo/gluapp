@@ -23,7 +23,11 @@ func NewApp(conf *Config) (*App, error) {
 	if conf.Path == "" {
 		return nil, fmt.Errorf("missing `conf.Path`")
 	}
-	appPath := filepath.Join(conf.Path, "app.lua")
+	epoint := "app.lua"
+	if conf.Entrypoint != "" {
+		epoint = conf.Entrypoint
+	}
+	appPath := filepath.Join(conf.Path, epoint)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("app entrypoint not found (%s)", appPath)
 	}

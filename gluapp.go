@@ -27,6 +27,9 @@ type Config struct {
 	// Path for looking up resources (Lua files, templates, public assets)
 	Path string
 
+	// Define the app entrypoint, default to `app.lua` (only valid for apps)
+	Entrypoint string
+
 	// HTTP client, if not set, `http.DefaultClient` will be used
 	Client *http.Client
 
