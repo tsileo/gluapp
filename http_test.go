@@ -19,7 +19,7 @@ func TestHTTP(t *testing.T) {
 	defer L.Close()
 
 	// Setup the state
-	L.PreloadModule("http", setupHTTP(http.DefaultClient))
+	L.PreloadModule("http", setupHTTP(http.DefaultClient, ""))
 	setupTestState(L, t)
 	L.SetGlobal("server_url", lua.LString(server.URL))
 
