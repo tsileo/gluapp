@@ -2,18 +2,23 @@ package gluapp
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"a4.io/blobstash/pkg/apps/luautil"
 
 	"github.com/yuin/gopher-lua"
 )
 
-func setupHTTP(client *http.Client) func(*lua.LState) int {
+func setupHTTP(client *http.Client, path string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
 		// Setup the Lua meta table the http (client) user-defined type
 		mtHTTP := L.NewTypeMetatable("http")
@@ -30,6 +35,17 @@ func setupHTTP(client *http.Client) func(*lua.LState) int {
 				client.password = string(L.ToString(3))
 				return 0
 			},
+			"log_request_to_file": func(L *lua.LState) int {
+				client := checkHTTPClient(L)
+				client.logToFile = L.ToBool(2)
+				client.logPath = filepath.Join(client.path, "requests_dump")
+				os.MkdirAll(client.logPath, 0700)
+				fmt.Printf("lll=%d\n", L.GetTop())
+				if L.GetTop() == 3 {
+					client.logPrefix = L.ToString(3) + "_"
+				}
+				return 0
+			},
 		}
 		for _, m := range methods {
 			clientMethods[strings.ToLower(m)] = httpClientDoReq(m)
@@ -40,6 +56,7 @@ func setupHTTP(client *http.Client) func(*lua.LState) int {
 		mod := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 			"new": func(L *lua.LState) int {
 				router := &httpClient{
+					path:   path,
 					client: client,
 					header: http.Header{},
 				}
@@ -56,10 +73,14 @@ func setupHTTP(client *http.Client) func(*lua.LState) int {
 }
 
 type httpClient struct {
-	client   *http.Client
-	header   http.Header
-	username string
-	password string
+	logToFile bool
+	logPath   string
+	logPrefix string
+	path      string
+	client    *http.Client
+	header    http.Header
+	username  string
+	password  string
 }
 
 func checkHTTPClient(L *lua.LState) *httpClient {
@@ -73,6 +94,11 @@ func checkHTTPClient(L *lua.LState) *httpClient {
 
 func httpClientDoReq(method string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
+		debug := map[string]interface{}{
+			"request":  map[string]interface{}{},
+			"response": map[string]interface{}{},
+		}
+		var debugReqBody string
 		client := checkHTTPClient(L)
 		rurl := L.ToString(2)
 
@@ -80,9 +106,32 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 
 		// Set the body if provided
 		var body io.Reader
-		if L.GetTop() == 3 {
+		if L.GetTop() >= 3 {
+			v := url.Values{}
 			switch lv := L.Get(3).(type) {
+			case *lua.LTable:
+				lv.ForEach(func(ikey lua.LValue, ivalue lua.LValue) {
+					key, _ := ikey.(lua.LString)
+					switch value := ivalue.(type) {
+					case lua.LString:
+						v.Set(string(key), string(value))
+					case lua.LNumber:
+						v.Set(string(key), fmt.Sprintf("%d", value))
+					default:
+						// TODO(tsileo): return an error
+					}
+
+				})
+			default:
+				// TODO(tsileo): return an error
+			}
+			rurl = fmt.Sprintf("%s?%s", rurl, v.Encode())
+		}
+
+		if L.GetTop() == 4 {
+			switch lv := L.Get(4).(type) {
 			case lua.LString:
+				debugReqBody = string(lv)
 				body = strings.NewReader(string(lv))
 			case *lua.LTable:
 				header.Set("Content-Type", "application/json")
@@ -96,6 +145,8 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 				// TODO(tsileo): return an error
 			}
 		}
+
+		// TODO handle args from a table
 
 		// Create the request
 		request, err := http.NewRequest(method, rurl, body)
@@ -126,6 +177,15 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 			}
 		}
 
+		if client.logToFile {
+			dreq := debug["request"].(map[string]interface{})
+			dreq["method"] = method
+			dreq["url"] = rurl
+			dreq["body"] = debugReqBody
+			dreq["headers"] = request.Header
+		}
+
+		start := time.Now()
 		resp, err := client.client.Do(request)
 		if err != nil {
 			L.Push(lua.LNil)
@@ -148,6 +208,24 @@ func httpClientDoReq(method string) func(*lua.LState) int {
 		out.RawSetH(lua.LString("headers"), buildHeaders(L, resp.Header))
 		out.RawSetH(lua.LString("proto"), lua.LString(resp.Proto))
 		out.RawSetH(lua.LString("body"), buildBody(L, rbody))
+
+		if client.logToFile {
+			dresp := debug["response"].(map[string]interface{})
+			dresp["status_code"] = resp.StatusCode
+			dresp["status_line"] = resp.Status
+			dresp["headers"] = resp.Header
+			dresp["proto"] = resp.Proto
+			dresp["body"] = string(rbody)
+			dresp["response_time"] = time.Since(start).String()
+			js, err := json.Marshal(debug)
+			if err != nil {
+				panic(err)
+			}
+			reqID := fmt.Sprintf("%s%d.json", client.logPrefix, time.Now().UnixNano())
+			if err := ioutil.WriteFile(filepath.Join(client.logPath, reqID), js, 0644); err != nil {
+				panic(err)
+			}
+		}
 
 		L.Push(out)
 		L.Push(lua.LNil)

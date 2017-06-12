@@ -27,3 +27,10 @@ end)
 
 router:run()
 ```
+
+## TODO
+
+ - [ ] Write Lua modules documentation
+ - [ ] A module for web scrapping
+ - [ ] A basic key-value store module
+ - [ ] `read_file`/`write_file`/`read_json` helper

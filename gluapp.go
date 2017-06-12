@@ -2,12 +2,15 @@ package gluapp // import "a4.io/gluapp"
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path/filepath"
 
+	"a4.io/blobstash/pkg/apps/luautil"
 	"a4.io/gluarequire2"
 
 	"github.com/yuin/gopher-lua"
+	"gopkg.in/yaml.v2"
 )
 
 // TODO(tsileo): a logFunc(t time.Time, msg string, args ...interface{})?
@@ -38,6 +41,9 @@ type Config struct {
 
 	// Hook executed just after the script execution, just before the request is written
 	AfterScriptExecHook func(L *lua.LState) error
+
+	// Hook for custom `log` backend, defautl to `fmt.Println`
+	LogHook func(logLine string) error
 
 	// Stack trace will be displayed in debug mode
 	Debug bool
@@ -88,6 +94,57 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	// Setup shared Lua metatables
 	setupMetatable(L)
 
+	if conf.Path != "" {
+		L.SetGlobal("read_yaml", L.NewFunction(func(L *lua.LState) int {
+			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
+			if err != nil {
+				panic(err)
+			}
+			res := map[string]interface{}{}
+			if err := yaml.Unmarshal([]byte(data), &res); err != nil {
+				panic(err)
+			}
+			L.Push(luautil.InterfaceToLValue(L, res))
+			return 1
+		}))
+		// TODO(tsileo): add read_file, write_file
+	}
+	L.SetGlobal("log", L.NewFunction(func(L *lua.LState) int {
+		var args []lua.LValue
+		for i := 1; i <= L.GetTop(); i++ {
+			item := L.Get(i)
+			// We don't want table to be displayed as "table: 0xc420272240"
+			if t, ok := item.(*lua.LTable); ok {
+				item = lua.LString(luautil.ToJSON(t))
+			}
+			args = append(args, item)
+		}
+
+		// Call `string.format`
+		if err := L.CallByParam(lua.P{
+			Fn:      lua.LValue(L.GetField(L.GetGlobal("string"), "format").(*lua.LFunction)),
+			NRet:    1,
+			Protect: true,
+		}, args...); err != nil {
+			panic(err)
+		}
+
+		// Get the result
+		logLine := string(L.Get(-1).(lua.LString))
+		L.Pop(1)
+
+		// Execute the hook
+		if conf.LogHook == nil {
+			fmt.Println(logLine)
+		} else {
+			if err := conf.LogHook(logLine); err != nil {
+				panic(err)
+			}
+		}
+
+		return 0
+	}))
+
 	// Setup `request`
 	req, err := newRequest(L, r)
 	if err != nil {
@@ -110,7 +167,7 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	if client == nil {
 		client = http.DefaultClient
 	}
-	L.PreloadModule("http", setupHTTP(client))
+	L.PreloadModule("http", setupHTTP(client, conf.Path))
 
 	L.PreloadModule("form", setupForm()) // must be executed after setupHTTP
 	L.PreloadModule("template", setupTemplate(filepath.Join(conf.Path, "templates")))
