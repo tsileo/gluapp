@@ -1,9 +1,11 @@
 package gluapp // import "a4.io/gluapp"
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"a4.io/blobstash/pkg/apps/luautil"
@@ -94,6 +96,15 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	// Setup shared Lua metatables
 	setupMetatable(L)
 
+	L.SetGlobal("random_string", L.NewFunction(func(L *lua.LState) int {
+		b := make([]byte, L.ToInt(1))
+		if _, err := rand.Read(b); err != nil {
+			panic(err)
+		}
+		L.Push(lua.LString(fmt.Sprintf("%x", b)))
+		return 1
+	}))
+
 	if conf.Path != "" {
 		L.SetGlobal("read_yaml", L.NewFunction(func(L *lua.LState) int {
 			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
@@ -106,6 +117,12 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 			}
 			L.Push(luautil.InterfaceToLValue(L, res))
 			return 1
+		}))
+		L.SetGlobal("delete_file", L.NewFunction(func(L *lua.LState) int {
+			if err := os.Remove(filepath.Join(conf.Path, L.ToString(1))); err != nil {
+				panic(err)
+			}
+			return 0
 		}))
 		L.SetGlobal("read_file", L.NewFunction(func(L *lua.LState) int {
 			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
