@@ -107,6 +107,15 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 			L.Push(luautil.InterfaceToLValue(L, res))
 			return 1
 		}))
+		L.SetGlobal("read_file", L.NewFunction(func(L *lua.LState) int {
+			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
+			if err != nil {
+				panic(err)
+			}
+			L.Push(lua.LString(data))
+			return 1
+		}))
+
 		// TODO(tsileo): add read_file, write_file
 	}
 	L.SetGlobal("log", L.NewFunction(func(L *lua.LState) int {
@@ -162,6 +171,7 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	// Setup other modules
 	L.PreloadModule("router", setupRouter(lresp, r.Method, r.URL.Path))
 	L.PreloadModule("json", loadJSON)
+	L.PreloadModule("cmd", setupCmd(conf.Path))
 
 	client := conf.Client
 	if client == nil {
