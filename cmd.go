@@ -7,6 +7,8 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+// Return a module with a single "run" function that run CLI commands and return the error
+// as a string.
 func setupCmd(cwd string) func(*lua.LState) int {
 	return func(L *lua.LState) int {
 		// register functions to the table

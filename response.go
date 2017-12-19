@@ -15,6 +15,8 @@ type Response struct {
 	Body       []byte
 	Header     http.Header
 	StatusCode int
+	redirect   string
+	req        *http.Request
 }
 
 // WriteTo dumps the respons to the actual  response.
@@ -38,17 +40,22 @@ func (resp *Response) WriteTo(w http.ResponseWriter) {
 				}
 			}
 		}
+		if resp.redirect != "" {
+			http.Redirect(w, resp.req, resp.redirect, resp.StatusCode)
+			return
+		}
 
 		w.WriteHeader(resp.StatusCode)
 		w.Write(resp.Body)
 	}
 }
 
-func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *Response) {
+func newResponse(L *lua.LState, w http.ResponseWriter, r *http.Request) (*lua.LUserData, *Response) {
 	resp := &Response{
 		buf:        bytes.NewBuffer(nil),
 		StatusCode: 200,
 		Header:     http.Header{},
+		req:        r,
 	}
 
 	// Copy the headers already set in the response
@@ -62,6 +69,7 @@ func newResponse(L *lua.LState, w http.ResponseWriter) (*lua.LUserData, *Respons
 	mt := L.NewTypeMetatable("response")
 	// methods
 	responseMethods := map[string]lua.LGFunction{
+		"redirect":   responseRedirect,
 		"set_status": responseStatus,
 		"headers":    responseHeaders,
 		"write":      responseWrite,
@@ -84,6 +92,18 @@ func checkResponse(L *lua.LState) *Response {
 	}
 	L.ArgError(1, "response expected")
 	return nil
+}
+
+func responseRedirect(L *lua.LState) int {
+	resp := checkResponse(L)
+	if resp == nil {
+		return 0
+	}
+	if resp.StatusCode == 0 || resp.StatusCode == 200 {
+		resp.StatusCode = 302
+	}
+	resp.redirect = L.ToString(2)
+	return 0
 }
 
 func responseStatus(L *lua.LState) int {

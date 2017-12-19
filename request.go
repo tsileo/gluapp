@@ -3,6 +3,7 @@ package gluapp
 import (
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/yuin/gopher-lua"
@@ -66,6 +67,7 @@ func newRequest(L *lua.LState, r *http.Request) (*lua.LUserData, error) {
 		"remote_addr": requestRemoteAddr,
 		"args":        requestArgs,
 		"form":        requestForm,
+		"method":      requestMethod,
 		// TODO(tsileo): implements `files` (return a table like Flask) and `basic_auth`
 		// "files": requestFiles,
 	}))
@@ -134,11 +136,11 @@ func requestForm(L *lua.LState) int {
 	if request == nil {
 		return 1
 	}
-	if err := request.request.ParseForm(); err != nil {
-		L.Push(lua.LNil)
-		return 1
+	values, err := url.ParseQuery(string(request.body))
+	if err != nil {
+		panic(err)
 	}
-	L.Push(buildValues(L, request.request.Form))
+	L.Push(buildValues(L, values))
 	return 1
 }
 

@@ -96,6 +96,7 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	// Setup shared Lua metatables
 	setupMetatable(L)
 
+	// FIXME(tsileo): move this in a separate module, along with the "path specific" (like read_yaml" into a separate module so BlobStash can use it as a "stdlib"
 	L.SetGlobal("random_string", L.NewFunction(func(L *lua.LState) int {
 		b := make([]byte, L.ToInt(1))
 		if _, err := rand.Read(b); err != nil {
@@ -177,7 +178,7 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 		return nil, err
 	}
 	// Initialize `response`
-	resp, lresp := newResponse(L, w)
+	resp, lresp := newResponse(L, w, r)
 
 	// Set the `app` global variable
 	rootTable := L.CreateTable(0, 2)
