@@ -1,18 +1,15 @@
 package gluapp // import "a4.io/gluapp"
 
 import (
-	"crypto/rand"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"a4.io/blobstash/pkg/apps/luautil"
+	"a4.io/gluapp/util"
 	"a4.io/gluarequire2"
 
 	"github.com/yuin/gopher-lua"
-	"gopkg.in/yaml.v2"
 )
 
 // TODO(tsileo): a logFunc(t time.Time, msg string, args ...interface{})?
@@ -97,45 +94,7 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	setupMetatable(L)
 
 	// FIXME(tsileo): move this in a separate module, along with the "path specific" (like read_yaml" into a separate module so BlobStash can use it as a "stdlib"
-	L.SetGlobal("random_string", L.NewFunction(func(L *lua.LState) int {
-		b := make([]byte, L.ToInt(1))
-		if _, err := rand.Read(b); err != nil {
-			panic(err)
-		}
-		L.Push(lua.LString(fmt.Sprintf("%x", b)))
-		return 1
-	}))
-
-	if conf.Path != "" {
-		L.SetGlobal("read_yaml", L.NewFunction(func(L *lua.LState) int {
-			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
-			if err != nil {
-				panic(err)
-			}
-			res := map[string]interface{}{}
-			if err := yaml.Unmarshal([]byte(data), &res); err != nil {
-				panic(err)
-			}
-			L.Push(luautil.InterfaceToLValue(L, res))
-			return 1
-		}))
-		L.SetGlobal("delete_file", L.NewFunction(func(L *lua.LState) int {
-			if err := os.Remove(filepath.Join(conf.Path, L.ToString(1))); err != nil {
-				panic(err)
-			}
-			return 0
-		}))
-		L.SetGlobal("read_file", L.NewFunction(func(L *lua.LState) int {
-			data, err := ioutil.ReadFile(filepath.Join(conf.Path, L.ToString(1)))
-			if err != nil {
-				panic(err)
-			}
-			L.Push(lua.LString(data))
-			return 1
-		}))
-
-		// TODO(tsileo): add read_file, write_file
-	}
+	util.Setup(L, conf.Path)
 	L.SetGlobal("log", L.NewFunction(func(L *lua.LState) int {
 		var args []lua.LValue
 		for i := 1; i <= L.GetTop(); i++ {
@@ -189,7 +148,6 @@ func setupState(L *lua.LState, conf *Config, w http.ResponseWriter, r *http.Requ
 	// Setup other modules
 	L.PreloadModule("router", setupRouter(lresp, r.Method, r.URL.Path))
 	L.PreloadModule("json", loadJSON)
-	L.PreloadModule("cmd", setupCmd(conf.Path))
 
 	client := conf.Client
 	if client == nil {
