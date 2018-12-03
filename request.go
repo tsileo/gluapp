@@ -131,7 +131,7 @@ func requestScheme(L *lua.LState) int {
 	}
 	scheme := "http"
 	if request.request.TLS != nil {
-		scheme := "https"
+		scheme = "https"
 	}
 	L.Push(lua.LString(scheme))
 	return 1
