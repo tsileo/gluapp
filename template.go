@@ -12,8 +12,15 @@ import (
 )
 
 var funcs = template.FuncMap{
-	"markdownify": func(md string) template.HTML {
-		return template.HTML(markdown.ToHTML([]byte(md), nil, nil))
+	"markdownify": func(raw interface{}) template.HTML {
+		switch md := raw.(type) {
+		case string:
+			return template.HTML(markdown.ToHTML([]byte(md), nil, nil))
+		case lua.LString:
+			return template.HTML(markdown.ToHTML([]byte(string(md)), nil, nil))
+		default:
+			panic("bad md type")
+		}
 	},
 }
 
