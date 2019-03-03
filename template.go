@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"a4.io/blobstash/pkg/apps/luautil"
-	blackfriday "github.com/russross/blackfriday.v1"
 
+	"github.com/gomarkdown/markdown"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -15,9 +15,9 @@ var funcs = template.FuncMap{
 	"markdownify": func(raw interface{}) template.HTML {
 		switch md := raw.(type) {
 		case string:
-			return template.HTML(blackfriday.MarkdownCommon([]byte(md)))
+			return template.HTML(markdown.ToHTML([]byte(md), nil, nil))
 		case lua.LString:
-			return template.HTML(blackfriday.MarkdownCommon([]byte(string(md))))
+			return template.HTML(markdown.TOHTML([]byte(string(md)), nil, nil))
 		default:
 			panic("bad md type")
 		}
