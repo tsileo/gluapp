@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"a4.io/blobstash/pkg/apps/luautil"
-	blackfriday "gopkg.in/russross/blackfriday.v1"
+	blackfriday "github.com/russross/blackfriday.v1"
 
 	"github.com/yuin/gopher-lua"
 )
