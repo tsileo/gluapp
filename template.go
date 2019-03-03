@@ -17,7 +17,7 @@ var funcs = template.FuncMap{
 		case string:
 			return template.HTML(markdown.ToHTML([]byte(md), nil, nil))
 		case lua.LString:
-			return template.HTML(markdown.TOHTML([]byte(string(md)), nil, nil))
+			return template.HTML(markdown.ToHTML([]byte(string(md)), nil, nil))
 		default:
 			panic("bad md type")
 		}
