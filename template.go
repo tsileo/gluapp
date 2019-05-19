@@ -15,6 +15,7 @@ import (
 var mdc = goldmark.New(
 	goldmark.WithRendererOptions(
 		html.WithHardWraps(),
+		html.WithUnsafe(),
 	),
 )
 
