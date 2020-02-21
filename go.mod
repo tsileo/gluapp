@@ -1,7 +1,7 @@
 module a4.io/gluapp
 
 require (
-	a4.io/blobstash v0.0.0-20200221184026-dea61889318d
+	a4.io/blobstash v0.0.0-20200221185322-50bf3c15ebe0
 	a4.io/gluarequire2 v0.0.0-20170611121149-66e0eb2c6a9f
 	github.com/yuin/goldmark v1.1.23
 	github.com/yuin/goldmark-highlighting v0.0.0-20200218065240-d1af22c1126f
