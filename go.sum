@@ -27,6 +27,8 @@ a4.io/gluapp v0.0.0-20200214202429-b4a08105811e/go.mod h1:P313jMDJOXJwnAA0qtWCSc
 a4.io/gluapp v0.0.0-20200221184138-44fb2766d27d/go.mod h1:SnPbw2WapvLDMfarcCs/pqYhYUvQqCk5u6TJjni5M3k=
 a4.io/gluarequire2 v0.0.0-20170611121149-66e0eb2c6a9f h1:mfEWN0Dd2AfIXU5WO5ZfqbFVk63Qz5M/CANs182pm+U=
 a4.io/gluarequire2 v0.0.0-20170611121149-66e0eb2c6a9f/go.mod h1:t7OhwCmPQfuUf8cjm7n8chSbZt5CTILu+dTLu1MQKjQ=
+a4.io/gluarequire2 v0.0.0-20200222094423-7528d5a10bc1 h1:prvtjU2SK4PCsJnvY39+DkQyLzxq39E5q0kOimBZsaY=
+a4.io/gluarequire2 v0.0.0-20200222094423-7528d5a10bc1/go.mod h1:mPtxfgeyyAcPonI669LtVTsmZfNSklo7kq3zSFej+jk=
 a4.io/go/indieauth v1.0.0/go.mod h1:yCJuSTw9d22VdPWrZ8frGLwVOdwscJTiXjG4IgVL0Vw=
 a4.io/ssse v0.0.0-20181202155639-1949828a8689/go.mod h1:/4k4qDJv4lDmiIcMs9k/5Rs7bU/1FkIvu42oMyf5A7Y=
 bazil.org/fuse v0.0.0-20180421153158-65cc252bf669/go.mod h1:Xbm+BRKSBEpa4q4hTSxohYNQpsxXPbPry4JJWOB3LB8=
