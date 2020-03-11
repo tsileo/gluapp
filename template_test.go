@@ -12,7 +12,7 @@ func TestTemplate(t *testing.T) {
 	defer L.Close()
 
 	// Setup the state
-	L.PreloadModule("template", setupTemplate("tests_data/"))
+	L.PreloadModule("template", setupTemplate("tests_data/", funcs))
 	setupTestState(L, t)
 
 	// Execute the Lua code
